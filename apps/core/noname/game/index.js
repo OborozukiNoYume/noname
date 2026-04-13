@@ -10207,7 +10207,7 @@ ${e instanceof Error ? e.stack : String(e)}`);
 	}
 	/**
 	 * @overload
-	 * @param { (player: Player) => boolean } func
+	 * @param { (player: Player) => boolean } [func]
 	 * @param { Player[] } [list]
 	 * @param { boolean } [includeOut]
 	 * @returns { Player[] }
@@ -10459,9 +10459,6 @@ ${e instanceof Error ? e.stack : String(e)}`);
 	syncHandcard(player, id_list) {
 		game.broadcastAll(
 			(player, id_list) => {
-				if (game.me == player) {
-					return;
-				}
 				const sortFunc = (a, b) => id_list.indexOf(a.cardid) - id_list.indexOf(b.cardid);
 				player.sortHandcard(sortFunc);
 			},
