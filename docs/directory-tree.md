@@ -295,7 +295,8 @@
 │       │   └── gradle             # Android 构建系统目录
 │       │       └── wrapper        # Gradle Wrapper 文件
 │       └── src                    # 移动端运行时补充脚本与 Capacitor 插件接口
-├── docs                            # 项目文档目录，包含启动、异步、音频、皮肤与目录结构说明
+├── docs                            # 项目文档目录，包含启动、异步、音频、皮肤、技能与目录结构说明
+│   └── skills                      # 技能文档目录，记录技能规则、源码位置与整理说明
 ├── packages                        # 工作区子包目录
 │   ├── extension                   # 工程化扩展源码工作区，initExtension.ts 会在此生成扩展包源码，并构建输出到 apps/core/extension
 │   ├── fs                          # 本地文件访问与静态资源服务子包（Fastify）
