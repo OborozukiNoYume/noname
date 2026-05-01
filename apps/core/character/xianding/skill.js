@@ -1611,12 +1611,12 @@ const skills = {
 							nature: "fire",
 							isCard: true,
 						},
-						"请选择火【杀】的目标（" + (i === 8 ? "⑨" : i + 1) + "/9）",
+						"平襄：请选择火【杀】的目标（" + (i === 8 ? "⑨" : i + 1) + "/9）",
 						false
 					)
 					.forResult();
 
-				if (!result.bool) {
+				if (!result?.bool) {
 					break;
 				}
 			}
@@ -1648,6 +1648,7 @@ const skills = {
 			},
 			combo: "tianren",
 		},
+		derivation: ["jiufa"],
 		subSkill: {
 			effect: {
 				marktext: "襄",
@@ -1753,7 +1754,7 @@ const skills = {
 				cards2 = result.cards;
 			} else {
 				if (cards.length > 0) {
-					const evt = target.randomDiscard(round);
+					const evt = target.randomDiscard(round, "h");
 					await evt;
 					cards2 = evt.done.cards2;
 				}
@@ -6663,15 +6664,10 @@ const skills = {
 		mark: true,
 		intro: {
 			content(storage, player) {
-				if (storage) {
-					return `每个回合结束时，若本回合有角色失去手牌数大于剩余手牌数，你可观看牌堆顶三张牌并交给其中一名角色其中一张，此牌离开其手牌区时，弃置体力值张手牌。`;
-				}
-				return `每个回合结束时，若本回合有角色失去手牌数大于剩余手牌数，你可观看牌堆顶三张牌并交给其中一名角色其中一张，此牌离开其手牌区时，摸体力值张牌（至多摸五）。`;
+				return `每个回合结束时，若本回合有角色失去手牌数不小于其当前手牌数，你可观看牌堆顶三张牌并交给其中一名角色其中一张，此牌离开其手牌区时，${storage ? "其弃置体力值张手牌" : "摸体力值张牌（至多摸五）"}。`;
 			},
 		},
-		trigger: {
-			global: "phaseEnd",
-		},
+		trigger: { global: "phaseEnd" },
 		filter(event, player) {
 			return get.info("dcsbyinmou").getTargets().length > 0;
 		},
@@ -6683,7 +6679,7 @@ const skills = {
 						cards.addArray(evt.hs);
 					}
 				});
-				return cards.length > target.countCards("h");
+				return cards.length >= target.countCards("h");
 			});
 		},
 		prompt2(event, player) {
@@ -6708,7 +6704,7 @@ const skills = {
 					createDialog: [`寅谋：将一张牌交给一名角色`, cards],
 					targets: targets,
 					filterTarget(card, player, target) {
-						return get.event().targets.includes(target);
+						return get.event().targets?.includes(target);
 					},
 					bool: bool,
 					forced: true,
@@ -6841,9 +6837,12 @@ const skills = {
 				};
 			}
 		},
-		prompt() {
-			const { hongceEvts: evts } = get.event();
-			const link = evts[0].link;
+		prompt(event, player) {
+			// 起许劭【评荐】询问发动触发技时会读技能的prompt以生成“是否发动某某技能”的技能提示，使用trigger和enable一起写的写法时需要注意prompt里分类讨论
+			if (event.name == "phase") {
+				return get.prompt('dcsbhongce', null, player);
+			}
+			const link = event.hongceEvts?.[0]?.link;
 			switch (link) {
 				case "sha": {
 					return "令一名角色将半数手牌替换为伤害牌，视为使用一张【杀】";
@@ -7490,7 +7489,7 @@ const skills = {
 		trigger: { global: "phaseUseBegin" },
 		round: 1,
 		filter(event, player) {
-			return player.countDiscardableCards(player, "h") > 0;
+			return player.countDiscardableCards(player, "h") > 0 && event.player != player;
 		},
 		async cost(event, trigger, player) {
 			event.result = await player
@@ -10234,315 +10233,6 @@ const skills = {
 					await player.draw(targets.length);
 				},
 			},
-		},
-	},
-	//威孙策
-	dczhifeng: {
-		audio: 2,
-		locked: false,
-		mod: {
-			cardUsable(card, player, num) {
-				if (card.storage?.dczhifeng && card.name == "jiu") {
-					return Infinity;
-				}
-			},
-			targetInRange(card, player) {
-				if (card.storage?.dczhifeng && card.name == "sha") {
-					return true;
-				}
-			},
-		},
-		hiddenCard(player, name) {
-			if ((player.getStat().skill.dczhifeng || 0) >= game.players.length + game.dead.length) {
-				return false;
-			}
-			const [cards, bool] = get.info("dczhifeng").getFilter(player);
-			if (_status.event.name == "chooseToRespond" && !["sha"].includes(name)) {
-				//, "shan"
-				return false;
-			}
-			return cards.some(namex => namex == name) && bool;
-		},
-		onChooseToUse(event) {
-			if (game.online) {
-				return;
-			}
-			event.set("dczhifeng", get.info("dczhifeng").getFilter(event.player));
-		},
-		onChooseToRespond(event) {
-			if (game.online) {
-				return;
-			}
-			event.set("dczhifeng", get.info("dczhifeng").getFilter(event.player));
-		},
-		enable: ["chooseToUse", "chooseToRespond"],
-		usable() {
-			return game.players.length + game.dead.length;
-		},
-		filter(event, player) {
-			if (!event.dczhifeng?.length) {
-				return false;
-			}
-			const [cards, bool] = event.dczhifeng;
-			if (!bool || (event.name == "chooseToRespond" && cards.some(name => !["sha"].includes(name)))) {
-				//, "shan"
-				return false;
-			}
-			return (
-				get.inpileVCardList(([_, __, name, nature]) => {
-					if (!cards.some(namex => namex == name)) {
-						return false;
-					}
-					const card = get.autoViewAs({ name, nature, storage: { dczhifeng: true } }, "unsure");
-					return event.filterCard(card, player, event);
-				}).length > 0
-			);
-		},
-		chooseButton: {
-			dialog(event, player) {
-				const [cards] = event.dczhifeng;
-				const vcards = get.inpileVCardList(([_, __, name, nature]) => {
-					if (!cards.some(namex => namex == name)) {
-						return false;
-					}
-					const card = get.autoViewAs({ name, nature, storage: { dczhifeng: true } }, "unsure");
-					return event.filterCard(card, player, event);
-				});
-				const dialog = ui.create.dialog("猘锋", [vcards, "vcard"]);
-				dialog.direct = true;
-				return dialog;
-			},
-			check({ link: [_, __, name] }) {
-				return get.order({ name }, get.player());
-			},
-			backup(links) {
-				const backup = get.info("dczhifeng_backup");
-				backup.audio = "dczhifeng";
-				backup.viewAs = { name: links[0][2], nature: links[0][3], storage: { dczhifeng: true } };
-				return backup;
-			},
-			prompt(links) {
-				let str;
-				if (["sha"].includes(links[0][2])) {
-					//, "shan"
-					str = "一张红色";
-				} else if (links[0][2] == "jiu") {
-					str = "至少一张黑色";
-				} else {
-					str = "任意张";
-				}
-				return `###猘锋###将${str}牌当做${get.translation(links[0][3]) || ""}${get.translation(links[0][2])}使用`;
-			},
-		},
-		getFilter(player, toOther) {
-			const hp = player.getHp(),
-				num = player.countCards("h") - (toOther ? 1 : 0);
-			if (num > hp) {
-				return [["jiu"], player.countCards("hes", { color: "black" }) >= 1];
-			} else if (num == hp) {
-				return [["juedou"], player.countCards("hes")];
-			}
-			return [["sha"], player.countCards("hes", { color: "red" })]; //, "shan"
-		},
-		ai: {
-			//respondShan: true,
-			respondSha: true,
-			skillTagFilter(player) {
-				if ((player.getStat().skill.dczhifeng || 0) >= game.players.length + game.dead.length) {
-					return false;
-				}
-				return (
-					player.getHp() > player.countCards("h") &&
-					player.hasCard(card => {
-						if (get.position(card) === "h" && _status.connectMode) {
-							return true;
-						}
-						return get.color(card) === "red";
-					}, "hes")
-				);
-			},
-			order(item, player) {
-				player = player || get.player();
-				const cards = get
-					.info("dczhifeng")
-					.getFilter(player)[0]
-					.map(name => get.order({ name }, player));
-				return Math.max(...cards) + 0.5;
-			},
-			result: {
-				player: 1,
-			},
-		},
-		subSkill: {
-			backup: {
-				position: "hes",
-				selectCard() {
-					const choice = get.info("dczhifeng_backup").viewAs.name;
-					if (["sha"].includes(choice)) {
-						//, "shan"
-						return [1, 1];
-					} else if (choice == "jiu") {
-						return [1, Infinity];
-					}
-					return [1, Infinity];
-				},
-				filterCard(card, player) {
-					const choice = get.info("dczhifeng_backup").viewAs.name;
-					if (["sha"].includes(choice)) {
-						//, "shan"
-						return get.color(card, player) == "red";
-					} else if (choice == "jiu") {
-						return get.color(card, player) == "black";
-					}
-					return true;
-				},
-				selectTarget() {
-					const card = get.card();
-					if (card.name == "juedou") {
-						return [1, 2];
-					}
-					const info = get.info(card);
-					return get.select(get.copy(info.selectTarget));
-				},
-				popname: true,
-				allowChooseAll: true,
-				log: false,
-				async precontent(event, trigger, player) {
-					player.logSkill("dczhifeng");
-					const name = event.result.card.name;
-					if (["sha"].includes(name)) {
-						//, "shan"
-						player.addTempSkill("dczhifeng_draw");
-					} else if (name == "jiu") {
-						event.getParent().addCount = false;
-					}
-				},
-				ai1(card) {
-					const player = get.player(),
-						name = get.info("dczhifeng_backup").viewAs.name,
-						num = ui.selected.cards.length;
-					if (num) {
-						if (name == "jiu" && num > 1) {
-							return 0;
-						} else if (name == "juedou") {
-							return 0;
-						}
-					}
-					return 7 - get.value(card, player);
-				},
-			},
-			draw: {
-				charlotte: true,
-				trigger: { player: ["useCard", "respond"] },
-				filter(event) {
-					return ["sha"].includes(event.card.name) && event.skill == "dczhifeng_backup"; //, "shan"
-				},
-				forced: true,
-				popup: false,
-				async content(event, trigger, player) {
-					await player.drawTo(player.maxHp);
-					player.removeSkill(event.name);
-				},
-			},
-		},
-	},
-	dcweijing: {
-		audio: 2,
-		trigger: { global: "phaseBegin" },
-		derivation: "dczhifeng",
-		filter(event, player) {
-			return event.player != player && event.player.group === "wu" && event.player.isIn();
-		},
-		async cost(event, trigger, player) {
-			const choiceList = [`对${get.translation(trigger.player)}造成1点伤害`, `令${get.translation(trigger.player)}交给你一张牌然后其可发动一次〖猘锋〗`],
-				choice = ["选项一", "选项二"];
-			if (!trigger.player.countGainableCards(player, "he")) {
-				choiceList[1] = `<span style="opacity:0.5">${choiceList[1]}</span>`;
-				choice.remove("选项二");
-			}
-			const { control } = await player
-				.chooseControl(choice, "cancel2")
-				.set("choiceList", choiceList)
-				.set("ai", (event, player) => {
-					const target = event.getTrigger().player;
-					if (get.damageEffect(target, player, player) > 0) {
-						return 0;
-					} else if (get.event().controls.includes("选项二")) {
-						const cards = get
-							.info("dczhifeng")
-							.getFilter(player, target != player)[0]
-							.flatMap(name => {
-								const card = get.autoViewAs({ name, storage: { dczhifeng: name == "jiu" } }, "unsure");
-								return target.hasUseTarget(card) ? [card] : [];
-							});
-						if (cards.some(card => target.getUseValue(card) * get.sgnAttitude(player, target) > 0)) {
-							return 1;
-						} else if (get.attitude(player, target) < 0 && !cards.length) {
-							return 1;
-						}
-					}
-					return "cancel2";
-				})
-				.forResult();
-			event.result = {
-				bool: control != "cancel2",
-				targets: [trigger.player],
-				cost_data: control,
-			};
-		},
-		async content(event, trigger, player) {
-			const {
-				targets: [target],
-				cost_data: control,
-			} = event;
-			if (control == "选项一") {
-				await target.damage();
-			} else {
-				if (player !== target) {
-					await target.chooseToGive(`威靖：交给${get.translation(player)}一张牌然后可发动一次【猘锋】`, player, "he", true);
-				}
-				const info = get.info("dczhifeng");
-				const [cards, bool] = info.getFilter(target);
-				const vcards = get.inpileVCardList(([_, __, name, nature]) => {
-					if (nature || !cards.some(namex => namex == name)) {
-						return false;
-					}
-					return target.hasUseTarget(get.autoViewAs({ name }, "unsure"));
-				});
-				if (!bool || !vcards.length) {
-					return;
-				}
-				const choice = vcards[0][2];
-				game.broadcastAll(
-					function (skill, name) {
-						lib.skill[skill].viewAs = { name };
-						lib.skill[skill].prompt = lib.skill.dczhifeng.chooseButton.prompt([[null, null, name]]);
-					},
-					"dczhifeng_backup",
-					choice
-				);
-				await target
-					.chooseToUse()
-					//.set("logSkill", "dczhifeng")
-					.set("openskilldialog", info.chooseButton.prompt([[null, null, choice]]))
-					.set("norestore", true)
-					.set("_backupevent", "dczhifeng_backup")
-					.set("custom", {
-						add: {},
-						replace: { window() {} },
-					})
-					.set("filterTarget", (card, player, target) => {
-						if (card.name == "sha") {
-							return lib.filter.targetEnabled.call(this, card, player, target);
-						}
-						return lib.filter.filterTarget.call(this, card, player, target);
-					})
-					.set("addCount", choice != "jiu")
-					/*.set("oncard", () => {
-						get.event().addSkillCount = false;
-					})*/
-					.backup("dczhifeng_backup");
-			}
 		},
 	},
 	//威曹操
